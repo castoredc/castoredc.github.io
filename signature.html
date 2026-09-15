@@ -114,7 +114,7 @@
     color:var(--ink-soft);
     margin-bottom:14px;
   }
-  #sig-mount{
+  #sig-mount-full, #sig-mount-compact{
     border:1px dashed var(--line);
     border-radius:6px;
     padding:20px;
@@ -127,7 +127,7 @@
     gap:12px;
     margin-top:16px;
   }
-  button#copy-btn{
+  .copy-btn{
     background:var(--accent);
     color:#fff;
     border:none;
@@ -137,9 +137,9 @@
     font-weight:600;
     cursor:pointer;
   }
-  button#copy-btn:hover{filter:brightness(1.06);}
-  button#copy-btn:active{filter:brightness(0.95);}
-  #copy-status{
+  .copy-btn:hover{filter:brightness(1.06);}
+  .copy-btn:active{filter:brightness(0.95);}
+  .copy-status{
     font-size:13px;
     color:var(--accent);
     min-height:18px;
@@ -236,28 +236,43 @@
   <div class="preview-wrap">
 
     <div class="preview-card">
-      <div class="label">Live preview</div>
-      <div id="sig-mount"></div>
+      <div class="label">For new emails</div>
+      <div id="sig-mount-full"></div>
 
       <div class="actions">
-        <button id="copy-btn">Copy signature</button>
-        <span id="copy-status"></span>
+        <button id="copy-btn-full" class="copy-btn" data-target="full">Copy signature</button>
+        <span id="copy-status-full" class="copy-status"></span>
       </div>
 
-      <div id="manual-copy" class="manual-copy">
+      <div id="manual-copy-full" class="manual-copy">
+        Automatic copying isn't working in this browser. Select the preview above manually
+        (click into it, Ctrl/Cmd+A, Ctrl/Cmd+C), then paste it into Gmail.
+      </div>
+    </div>
+
+    <div class="preview-card">
+      <div class="label">For replies &amp; forwards (shorter)</div>
+      <div id="sig-mount-compact"></div>
+
+      <div class="actions">
+        <button id="copy-btn-compact" class="copy-btn" data-target="compact">Copy signature</button>
+        <span id="copy-status-compact" class="copy-status"></span>
+      </div>
+
+      <div id="manual-copy-compact" class="manual-copy">
         Automatic copying isn't working in this browser. Select the preview above manually
         (click into it, Ctrl/Cmd+A, Ctrl/Cmd+C), then paste it into Gmail.
       </div>
     </div>
 
     <div class="panel">
-      <h2>How to add it in Gmail</h2>
+      <h2>How to add both in Gmail</h2>
       <ol class="steps">
-        <li>Click <strong>"Copy signature"</strong> above.</li>
+        <li>Click <strong>"Copy signature"</strong> under <strong>"For new emails"</strong> above.</li>
         <li>Go to Gmail → gear icon top right → <strong>"See all settings"</strong>.</li>
-        <li>Scroll to the <strong>"Signature"</strong> section and click <strong>"Create new"</strong>, give it a name (e.g. "Castor").</li>
-        <li>Click into the empty text box and paste with <strong>Ctrl/Cmd+V</strong>.</li>
-        <li>Set this signature as default for new emails and for replies/forwards.</li>
+        <li>Scroll to <strong>"Signature"</strong>, click <strong>"Create new"</strong>, name it e.g. <em>"Castor – New"</em>, and paste it in.</li>
+        <li>Now copy the <strong>"For replies &amp; forwards"</strong> version above, and create a second signature named e.g. <em>"Castor – Reply"</em>.</li>
+        <li>Further down, under <strong>"Signature defaults"</strong>, set <strong>"FOR NEW EMAILS USE"</strong> to your first signature, and <strong>"ON REPLY/FORWARD USE"</strong> to the second.</li>
         <li>Scroll down and click <strong>"Save Changes"</strong>.</li>
       </ol>
     </div>
@@ -277,43 +292,72 @@
     websiteUrl: "https://www.castoredc.com"
   };
 
-  const mount = document.getElementById('sig-mount');
+  const mounts = {
+    full: document.getElementById('sig-mount-full'),
+    compact: document.getElementById('sig-mount-compact')
+  };
 
   function esc(s){
     return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
-  function buildSignatureHTML(data){
+  // Builds the contact line as separate non-breaking chunks joined by normal
+  // spaces, so the browser can wrap between items (email | phone | site |
+  // LinkedIn) instead of breaking mid-item or leaving an indented orphan
+  // line like a lone "LinkedIn" hanging below with leading spaces.
+  function buildContactLine(items){
+    const sep = ' <span style="color:#B9C2CE;">|</span> ';
+    return items.map(item => `<span style="white-space:nowrap;">${item}</span>`).join(sep);
+  }
+
+  function contactItems(data){
+    const items = [];
+    if (data.email) items.push(`<a href="mailto:${esc(data.email)}" style="color:${CONFIG.brandColor};text-decoration:none;">${esc(data.email)}</a>`);
+    if (data.phone) items.push(esc(data.phone));
+    items.push(`<a href="${CONFIG.websiteUrl}" style="color:${CONFIG.brandColor};text-decoration:none;">${esc(CONFIG.website)}</a>`);
+    if (data.linkedin) items.push(`<a href="${esc(data.linkedin)}" style="color:${CONFIG.brandColor};text-decoration:none;">LinkedIn</a>`);
+    return items;
+  }
+
+  // Full version — with logo — for new emails.
+  function buildFullSignatureHTML(data){
     // Table-based layout + fully inline styles: this is what survives
     // being pasted into Gmail's signature editor.
     const rows = [];
-
     if (data.title || data.dept) {
       const sub = [data.title, data.dept].filter(Boolean).join(' · ');
       rows.push(`<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#45597E;margin:2px 0 8px;">${esc(sub)}</div>`);
     }
 
-    const contactLines = [];
-    if (data.email) contactLines.push(`<a href="mailto:${esc(data.email)}" style="color:${CONFIG.brandColor};text-decoration:none;">${esc(data.email)}</a>`);
-    if (data.phone) contactLines.push(esc(data.phone));
-    contactLines.push(`<a href="${CONFIG.websiteUrl}" style="color:${CONFIG.brandColor};text-decoration:none;">${esc(CONFIG.website)}</a>`);
-    if (data.linkedin) contactLines.push(`<a href="${esc(data.linkedin)}" style="color:${CONFIG.brandColor};text-decoration:none;">LinkedIn</a>`);
-
     return `
 <table cellpadding="0" cellspacing="0" border="0" style="font-family:'Poppins',Arial,Helvetica,sans-serif;border-collapse:collapse;">
   <tr>
-    <td style="padding-right:16px;border-right:2px solid ${CONFIG.dividerColor};vertical-align:top;">
+    <td style="padding-right:16px;border-right:2px solid ${CONFIG.dividerColor};vertical-align:middle;">
       <img src="${CONFIG.logoUrl}" alt="Castor" width="${CONFIG.logoWidth}" height="${CONFIG.logoHeight}" style="display:block;border:0;max-width:${CONFIG.logoWidth}px;" />
     </td>
-    <td style="padding-left:16px;vertical-align:top;">
+    <td style="padding-left:16px;vertical-align:middle;">
       <div style="font-size:15px;font-weight:bold;color:${CONFIG.brandColor};margin-bottom:2px;">${esc(data.name) || 'Jane Smith'}</div>
       ${rows.join('')}
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:#1D3257;">
-        ${contactLines.join('&nbsp;&nbsp;|&nbsp;&nbsp;')}
+        ${buildContactLine(contactItems(data))}
       </div>
     </td>
   </tr>
 </table>`.trim();
+  }
+
+  // Compact version — no logo, one line — for replies/forwards.
+  function buildCompactSignatureHTML(data){
+    const subParts = [data.title, data.dept].filter(Boolean);
+    const nameChunk = `<span style="font-weight:bold;color:${CONFIG.brandColor};">${esc(data.name) || 'Jane Smith'}</span>`;
+    const subChunk = subParts.length ? `<span style="color:#45597E;">${esc(subParts.join(' · '))}</span>` : '';
+    const headParts = [nameChunk, subChunk].filter(Boolean);
+
+    return `
+<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:#1D3257;">
+  ${buildContactLine(headParts)}<br/>
+  ${buildContactLine(contactItems(data))}
+</div>`.trim();
   }
 
   function currentData(){
@@ -328,7 +372,9 @@
   }
 
   function render(){
-    mount.innerHTML = buildSignatureHTML(currentData());
+    const data = currentData();
+    mounts.full.innerHTML = buildFullSignatureHTML(data);
+    mounts.compact.innerHTML = buildCompactSignatureHTML(data);
   }
 
   ['f-name','f-title','f-dept','f-email','f-phone','f-linkedin'].forEach(id=>{
@@ -338,27 +384,30 @@
 
   // ---- Copy: writes both text/html and text/plain so Gmail's
   // rich-text signature field keeps the formatting on paste. ----
-  document.getElementById('copy-btn').addEventListener('click', async () => {
-    const status = document.getElementById('copy-status');
-    const html = mount.innerHTML;
-    const plain = mount.innerText;
+  ['full','compact'].forEach(target => {
+    document.getElementById(`copy-btn-${target}`).addEventListener('click', async () => {
+      const status = document.getElementById(`copy-status-${target}`);
+      const mount = mounts[target];
+      const html = mount.innerHTML;
+      const plain = mount.innerText;
 
-    try {
-      if (window.ClipboardItem) {
-        const item = new ClipboardItem({
-          'text/html': new Blob([html], { type: 'text/html' }),
-          'text/plain': new Blob([plain], { type: 'text/plain' })
-        });
-        await navigator.clipboard.write([item]);
-        status.textContent = 'Copied — paste it into the Gmail signature field now.';
-        document.getElementById('manual-copy').classList.remove('show');
-      } else {
-        throw new Error('ClipboardItem not supported');
+      try {
+        if (window.ClipboardItem) {
+          const item = new ClipboardItem({
+            'text/html': new Blob([html], { type: 'text/html' }),
+            'text/plain': new Blob([plain], { type: 'text/plain' })
+          });
+          await navigator.clipboard.write([item]);
+          status.textContent = 'Copied — paste it into the Gmail signature field now.';
+          document.getElementById(`manual-copy-${target}`).classList.remove('show');
+        } else {
+          throw new Error('ClipboardItem not supported');
+        }
+      } catch (err) {
+        status.textContent = '';
+        document.getElementById(`manual-copy-${target}`).classList.add('show');
       }
-    } catch (err) {
-      status.textContent = '';
-      document.getElementById('manual-copy').classList.add('show');
-    }
+    });
   });
 </script>
 
