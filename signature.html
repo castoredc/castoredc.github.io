@@ -98,6 +98,22 @@
     margin-top:14px;
     line-height:1.5;
   }
+  .section-divider{
+    border:none;
+    border-top:1px solid var(--line);
+    margin:20px 0 16px;
+  }
+  .section-label{
+    font-size:12px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:10px;
+  }
+  .date-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
   .preview-wrap{
     display:flex;
     flex-direction:column;
@@ -227,7 +243,41 @@
       <input id="f-linkedin" type="text" placeholder="https://linkedin.com/in/janesmith" />
     </div>
 
-    <div class="hint">
+    <hr class="section-divider" />
+    <div class="section-label">Awareness day / week / month (optional)</div>
+    <div class="field">
+      <label for="f-event">Highlight an event</label>
+      <select id="f-event">
+        <option value="">None</option>
+      </select>
+    </div>
+    <div class="hint" style="margin-top:-4px;">
+      Recolors the logo and adds a short line to the signature. Dates shift a
+      little year to year — this list uses the general month/timeframe. Since
+      the recolored logo is embedded as an inline image, do one test: copy,
+      paste into Gmail, save, and send yourself a test email to confirm it
+      still shows up after saving.
+    </div>
+
+    <hr class="section-divider" />
+    <div class="section-label">Upcoming leave (optional)</div>
+    <div class="date-row">
+      <div class="field">
+        <label for="f-leave-start">Away from</label>
+        <input id="f-leave-start" type="date" />
+      </div>
+      <div class="field">
+        <label for="f-leave-end">Back on</label>
+        <input id="f-leave-end" type="date" />
+      </div>
+    </div>
+    <div class="field">
+      <label for="f-leave-note">Custom note (optional, overrides the dates above)</label>
+      <input id="f-leave-note" type="text" placeholder="e.g. Limited availability until Monday" />
+    </div>
+
+    <hr class="section-divider" />
+    <div class="hint" style="margin-top:0;">
       Logo and colors are fixed in the template and the same for everyone — this keeps the brand identity uniform.
     </div>
   </div>
@@ -292,10 +342,86 @@
     websiteUrl: "https://www.castoredc.com"
   };
 
+  // Curated from the uploaded therapeutic/cultural event calendar. month is
+  // 1-12 for sort order in the dropdown; day is informational only (shown
+  // in the label) since exact dates shift year to year. colors: one hex =
+  // solid fill, several = a left-to-right gradient across the logo.
+  const EVENTS = [
+    { id:'world-cancer-day',   label:'World Cancer Day',                    month:2,  day:4,  colors:['#A67DB8'] },
+    { id:'heart-month',        label:'American Heart Month',                month:2,  day:null, colors:['#D7263D'] },
+    { id:'rare-disease-day',   label:'Rare Disease Day',                    month:2,  day:'last day', colors:['#5B7FDE'] },
+    { id:'womens-day',         label:"International Women's Day",          month:3,  day:8,  colors:['#8E44AD'] },
+    { id:'kidney-day',         label:'World Kidney Day',                    month:3,  day:null, colors:['#43A047'] },
+    { id:'down-syndrome-day',  label:'World Down Syndrome Day',             month:3,  day:21, colors:['#FFD200','#2E86DE'] },
+    { id:'autism-day',         label:'World Autism Awareness Day / Month',  month:4,  day:2,  colors:['#2E86DE'] },
+    { id:'mental-health-month',label:'Mental Health Awareness Month',       month:5,  day:null, colors:['#6FCF97'] },
+    { id:'pride-month',        label:'Pride Month',                         month:6,  day:null, colors:['#E4002B','#FF8C00','#FFD500','#2E8B57','#0078D4','#732982'] },
+    { id:'hepatitis-day',      label:'World Hepatitis Day',                 month:7,  day:28, colors:['#E63946'] },
+    { id:'childhood-cancer',   label:'Childhood Cancer Awareness Month',    month:9,  day:null, colors:['#F4C430'] },
+    { id:'suicide-prevention', label:'World Suicide Prevention Day',        month:9,  day:10, colors:['#FFE066'] },
+    { id:'prostate-cancer',    label:'Prostate Cancer Awareness Month',     month:9,  day:null, colors:['#4FC3F7'] },
+    { id:'world-heart-day',    label:'World Heart Day',                     month:9,  day:29, colors:['#D7263D'] },
+    { id:'breast-cancer',      label:'Breast Cancer Awareness Month',       month:10, day:null, colors:['#EC609B'] },
+    { id:'mental-health-day',  label:'World Mental Health Day',             month:10, day:10, colors:['#6FCF97'] },
+    { id:'movember',           label:"Movember / Men's Health Awareness",   month:11, day:null, colors:['#1D3557'] },
+    { id:'diabetes-day',       label:'World Diabetes Day',                  month:11, day:14, colors:['#0072CE'] },
+    { id:'alzheimers-month',   label:"Alzheimer's Awareness Month",         month:11, day:null, colors:['#7B2CBF'] },
+    { id:'aids-day',           label:'World AIDS Day',                      month:12, day:1,  colors:['#E4032E'] },
+  ];
+
   const mounts = {
     full: document.getElementById('sig-mount-full'),
     compact: document.getElementById('sig-mount-compact')
   };
+
+  const eventSelect = document.getElementById('f-event');
+  const monthName = m => new Date(2000, m-1, 1).toLocaleDateString('en-US', { month:'long' });
+  EVENTS
+    .slice()
+    .sort((a,b) => a.month - b.month)
+    .forEach(ev => {
+      const opt = document.createElement('option');
+      opt.value = ev.id;
+      opt.textContent = `${monthName(ev.month)} — ${ev.label}`;
+      eventSelect.appendChild(opt);
+    });
+
+  // Logo recoloring: draws the (transparent-background) logo onto a canvas
+  // and fills the opaque pixels with a solid color or left-to-right
+  // gradient, using source-in compositing. Falls back to the original
+  // static logo if the image hasn't loaded or the canvas is tainted (e.g.
+  // when testing locally over file:// instead of a real deployment).
+  const logoImg = new Image();
+  const logoReady = new Promise(resolve => {
+    logoImg.onload = resolve;
+    logoImg.onerror = resolve;
+  });
+  logoImg.src = CONFIG.logoUrl;
+
+  async function getLogoSrc(colors){
+    if (!colors || !colors.length) return CONFIG.logoUrl;
+    await logoReady;
+    if (!logoImg.naturalWidth) return CONFIG.logoUrl;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = logoImg.naturalWidth;
+      canvas.height = logoImg.naturalHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(logoImg, 0, 0);
+      ctx.globalCompositeOperation = 'source-in';
+      if (colors.length === 1) {
+        ctx.fillStyle = colors[0];
+      } else {
+        const grad = ctx.createLinearGradient(0, 0, canvas.width, 0);
+        colors.forEach((c, i) => grad.addColorStop(i / (colors.length - 1), c));
+        ctx.fillStyle = grad;
+      }
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png');
+    } catch (err) {
+      return CONFIG.logoUrl; // tainted canvas or unsupported — fall back silently
+    }
+  }
 
   function esc(s){
     return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -319,8 +445,15 @@
     return items;
   }
 
+  function formatLeaveText(data){
+    if (data.leaveNote) return data.leaveNote;
+    if (!data.leaveStart) return '';
+    const fmt = iso => new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+    return data.leaveEnd ? `Away ${fmt(data.leaveStart)} – ${fmt(data.leaveEnd)}` : `Away from ${fmt(data.leaveStart)}`;
+  }
+
   // Full version — with logo — for new emails.
-  function buildFullSignatureHTML(data){
+  function buildFullSignatureHTML(data, event, logoSrc, leaveText){
     // Table-based layout + fully inline styles: this is what survives
     // being pasted into Gmail's signature editor.
     const rows = [];
@@ -329,11 +462,15 @@
       rows.push(`<div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#45597E;margin:2px 0 8px;">${esc(sub)}</div>`);
     }
 
+    const extraLines = [];
+    if (event) extraLines.push(`<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${event.colors[0]};margin-top:6px;">Supporting ${esc(event.label)}</div>`);
+    if (leaveText) extraLines.push(`<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-style:italic;color:#45597E;margin-top:4px;">${esc(leaveText)}</div>`);
+
     return `
 <table cellpadding="0" cellspacing="0" border="0" style="font-family:'Poppins',Arial,Helvetica,sans-serif;border-collapse:collapse;">
   <tr>
     <td style="padding-right:16px;border-right:2px solid ${CONFIG.dividerColor};vertical-align:middle;">
-      <img src="${CONFIG.logoUrl}" alt="Castor" width="${CONFIG.logoWidth}" height="${CONFIG.logoHeight}" style="display:block;border:0;max-width:${CONFIG.logoWidth}px;" />
+      <img src="${logoSrc}" alt="Castor" width="${CONFIG.logoWidth}" height="${CONFIG.logoHeight}" style="display:block;border:0;max-width:${CONFIG.logoWidth}px;" />
     </td>
     <td style="padding-left:16px;vertical-align:middle;">
       <div style="font-size:15px;font-weight:bold;color:${CONFIG.brandColor};margin-bottom:2px;">${esc(data.name) || 'Jane Smith'}</div>
@@ -341,22 +478,28 @@
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:#1D3257;">
         ${buildContactLine(contactItems(data))}
       </div>
+      ${extraLines.join('')}
     </td>
   </tr>
 </table>`.trim();
   }
 
   // Compact version — no logo, one line — for replies/forwards.
-  function buildCompactSignatureHTML(data){
+  function buildCompactSignatureHTML(data, event, leaveText){
     const subParts = [data.title, data.dept].filter(Boolean);
     const nameChunk = `<span style="font-weight:bold;color:${CONFIG.brandColor};">${esc(data.name) || 'Jane Smith'}</span>`;
     const subChunk = subParts.length ? `<span style="color:#45597E;">${esc(subParts.join(' · '))}</span>` : '';
     const headParts = [nameChunk, subChunk].filter(Boolean);
 
+    const extraLines = [];
+    if (event) extraLines.push(`<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;color:${event.colors[0]};margin-top:4px;">Supporting ${esc(event.label)}</div>`);
+    if (leaveText) extraLines.push(`<div style="font-family:Arial,Helvetica,sans-serif;font-size:12px;font-style:italic;color:#45597E;margin-top:2px;">${esc(leaveText)}</div>`);
+
     return `
 <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:#1D3257;">
   ${buildContactLine(headParts)}<br/>
   ${buildContactLine(contactItems(data))}
+  ${extraLines.join('')}
 </div>`.trim();
   }
 
@@ -368,17 +511,29 @@
       email: document.getElementById('f-email').value,
       phone: document.getElementById('f-phone').value,
       linkedin: document.getElementById('f-linkedin').value,
+      eventId: document.getElementById('f-event').value,
+      leaveStart: document.getElementById('f-leave-start').value,
+      leaveEnd: document.getElementById('f-leave-end').value,
+      leaveNote: document.getElementById('f-leave-note').value,
     };
   }
 
-  function render(){
+  async function render(){
     const data = currentData();
-    mounts.full.innerHTML = buildFullSignatureHTML(data);
-    mounts.compact.innerHTML = buildCompactSignatureHTML(data);
+    const event = EVENTS.find(e => e.id === data.eventId) || null;
+    const leaveText = formatLeaveText(data);
+    const logoSrc = await getLogoSrc(event ? event.colors : null);
+
+    mounts.full.innerHTML = buildFullSignatureHTML(data, event, logoSrc, leaveText);
+    mounts.compact.innerHTML = buildCompactSignatureHTML(data, event, leaveText);
   }
 
-  ['f-name','f-title','f-dept','f-email','f-phone','f-linkedin'].forEach(id=>{
-    document.getElementById(id).addEventListener('input', render);
+  [
+    'f-name','f-title','f-dept','f-email','f-phone','f-linkedin',
+    'f-event','f-leave-start','f-leave-end','f-leave-note'
+  ].forEach(id=>{
+    const el = document.getElementById(id);
+    el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', render);
   });
   render();
 
