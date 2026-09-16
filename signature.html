@@ -219,6 +219,11 @@
     </div>
 
     <div class="field">
+      <label for="f-pronouns">Pronouns (optional)</label>
+      <input id="f-pronouns" type="text" placeholder="she/her" />
+    </div>
+
+    <div class="field">
       <label for="f-title">Job title</label>
       <input id="f-title" type="text" placeholder="Customer Success Manager" />
     </div>
@@ -241,6 +246,11 @@
     <div class="field">
       <label for="f-linkedin">LinkedIn URL (optional)</label>
       <input id="f-linkedin" type="text" placeholder="https://linkedin.com/in/janesmith" />
+    </div>
+
+    <div class="field">
+      <label for="f-timezone">Time zone (optional)</label>
+      <input id="f-timezone" type="text" placeholder="CET" />
     </div>
 
     <hr class="section-divider" />
@@ -440,6 +450,7 @@
     const items = [];
     if (data.email) items.push(`<a href="mailto:${esc(data.email)}" style="color:${CONFIG.brandColor};text-decoration:none;">${esc(data.email)}</a>`);
     if (data.phone) items.push(esc(data.phone));
+    if (data.timezone) items.push(esc(data.timezone));
     items.push(`<a href="${CONFIG.websiteUrl}" style="color:${CONFIG.brandColor};text-decoration:none;">${esc(CONFIG.website)}</a>`);
     if (data.linkedin) items.push(`<a href="${esc(data.linkedin)}" style="color:${CONFIG.brandColor};text-decoration:none;">LinkedIn</a>`);
     return items;
@@ -473,7 +484,7 @@
       <img src="${logoSrc}" alt="Castor" width="${CONFIG.logoWidth}" height="${CONFIG.logoHeight}" style="display:block;border:0;max-width:${CONFIG.logoWidth}px;" />
     </td>
     <td style="padding-left:16px;vertical-align:middle;">
-      <div style="font-size:15px;font-weight:bold;color:${CONFIG.brandColor};margin-bottom:2px;">${esc(data.name) || 'Jane Smith'}</div>
+      <div style="font-size:15px;font-weight:bold;color:${CONFIG.brandColor};margin-bottom:2px;">${esc(data.name) || 'Jane Smith'}${data.pronouns ? ` <span style="font-weight:normal;font-size:12.5px;color:#45597E;">(${esc(data.pronouns)})</span>` : ''}</div>
       ${rows.join('')}
       <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.7;color:#1D3257;">
         ${buildContactLine(contactItems(data))}
@@ -487,7 +498,7 @@
   // Compact version — no logo, one line — for replies/forwards.
   function buildCompactSignatureHTML(data, event, leaveText){
     const subParts = [data.title, data.dept].filter(Boolean);
-    const nameChunk = `<span style="font-weight:bold;color:${CONFIG.brandColor};">${esc(data.name) || 'Jane Smith'}</span>`;
+    const nameChunk = `<span style="font-weight:bold;color:${CONFIG.brandColor};">${esc(data.name) || 'Jane Smith'}${data.pronouns ? ` <span style="font-weight:normal;color:#45597E;">(${esc(data.pronouns)})</span>` : ''}</span>`;
     const subChunk = subParts.length ? `<span style="color:#45597E;">${esc(subParts.join(' · '))}</span>` : '';
     const headParts = [nameChunk, subChunk].filter(Boolean);
 
@@ -506,10 +517,12 @@
   function currentData(){
     return {
       name: document.getElementById('f-name').value,
+      pronouns: document.getElementById('f-pronouns').value,
       title: document.getElementById('f-title').value,
       dept: document.getElementById('f-dept').value,
       email: document.getElementById('f-email').value,
       phone: document.getElementById('f-phone').value,
+      timezone: document.getElementById('f-timezone').value,
       linkedin: document.getElementById('f-linkedin').value,
       eventId: document.getElementById('f-event').value,
       leaveStart: document.getElementById('f-leave-start').value,
@@ -529,7 +542,7 @@
   }
 
   [
-    'f-name','f-title','f-dept','f-email','f-phone','f-linkedin',
+    'f-name','f-pronouns','f-title','f-dept','f-email','f-phone','f-timezone','f-linkedin',
     'f-event','f-leave-start','f-leave-end','f-leave-note'
   ].forEach(id=>{
     const el = document.getElementById(id);
